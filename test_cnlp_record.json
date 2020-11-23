@@ -10,5 +10,17 @@
 			"document_id": 1,
 			"project": "my_project1"
 		}
+	},
+	{
+		"data": "patient is severely obese. patient is considering weight loss surgery. patient experiencing hearing loss\nno mental confusion\nrecently feeling depressed",
+		"metadata": {
+			"patient_id": 1002,
+			"patient_surname": "Holiday",
+			"patient_forename": "Jane",
+			"patient_dob": "1983-02-08",
+			"patient_gender": "F",
+			"document_id": 3,
+			"project": "my_project1"
+		}
 	}
 ]}
