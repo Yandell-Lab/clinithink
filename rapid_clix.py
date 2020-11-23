@@ -1,4 +1,5 @@
 import sys
+import configparser
 import argparse
 import json
 import requests
@@ -9,13 +10,16 @@ import csv
 
 #------------ Argument Parse ------------#
 #----------------------------------------#
+conf = configparser.ConfigParser()
+conf.read('config.ini')
+
 parser = argparse.ArgumentParser()
-parser.add_argument('-f', '--file', action='store')
-parser.add_argument('-r', '--resource', action='store')
-parser.add_argument('-k', '--apikey', action='store')
-parser.add_argument('-s', '--apisecret', action='store')
-parser.add_argument('-c', '--cacert', action='store')
-parser.add_argument('-o', '--output', action='store')
+parser.add_argument('-f', '--file', action='store', default=conf['DEFAULT']['file'])
+parser.add_argument('-r', '--resource', action='store', default=conf['DEFAULT']['resource'])
+parser.add_argument('-k', '--apikey', action='store', default=conf['DEFAULT']['apikey'])
+parser.add_argument('-s', '--apisecret', action='store', required=True)
+parser.add_argument('-c', '--cacert', action='store', default=conf['DEFAULT']['cacert'])
+parser.add_argument('-o', '--output', action='store', default=conf['DEFAULT']['output'])
 args = parser.parse_args()
 
 
@@ -92,14 +96,14 @@ def format_response(doc, resp, record):
 def flatten_response(resp):
     r_flat = []
     mrn = resp['MetaData']['patient_id']
-    sname = resp['MetaData'].get('patient_surname', NULL)
-    fname = resp['MetaData'].get('patient_forename', NULL)
-    dob = resp['MetaData'].get('patient_dob', NULL)
-    sex = resp['MetaData'].get('patient_gender', NULL)
-    visid = resp['MetaData'].get('visit_id', NULL)
+    sname = resp['MetaData'].get('patient_surname', None)
+    fname = resp['MetaData'].get('patient_forename', None)
+    dob = resp['MetaData'].get('patient_dob', None)
+    sex = resp['MetaData'].get('patient_gender', None)
+    visid = resp['MetaData'].get('visit_id', None)
     docid = resp['MetaData']['document_id']
     proj = resp['MetaData']['project']
-    auth = resp['MetaData'].get('author', NULL)
+    auth = resp['MetaData'].get('author', None)
     
     for x in resp['Encoding']:
         r_flat.append([
