@@ -1,7 +1,9 @@
 import sys
 import configparser
 import argparse
+import zipfile
 import json
+import random
 import requests
 import csv
 
@@ -14,12 +16,20 @@ conf = configparser.ConfigParser()
 conf.read('config.ini')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-f', '--file', action='store', default=conf['DEFAULT']['file'])
-parser.add_argument('-r', '--resource', action='store', default=conf['DEFAULT']['resource'])
-parser.add_argument('-k', '--apikey', action='store', default=conf['DEFAULT']['apikey'])
-parser.add_argument('-s', '--apisecret', action='store', required=True)
-parser.add_argument('-c', '--cacert', action='store', default=conf['DEFAULT']['cacert'])
-parser.add_argument('-o', '--output', action='store', default=conf['DEFAULT']['output'])
+parser.add_argument('-f', '--file', action='store', default=conf['DEFAULT']['file'],
+        help='JSON or zipped JSON file containing clinical documents.')
+parser.add_argument('-r', '--resource', action='store', default=conf['DEFAULT']['resource'],
+        help='Name of resource set.')
+parser.add_argument('-k', '--apikey', action='store', default=conf['DEFAULT']['apikey'],
+        help='User-specific API key from Clinithink.')
+parser.add_argument('-s', '--apisecret', action='store', required=True,
+        help='User-specific secret key from Clinithink.')
+parser.add_argument('-c', '--cacert', action='store', default=conf['DEFAULT']['cacert'],
+        help='File path of CA certificate (.pem) used for SSL verification.')
+parser.add_argument('-g', '--group', action='store_true', default=False,
+        help='Group documents by patient_id. Reduces number of requests sent to server.')
+parser.add_argument('-o', '--output', action='store', default=conf['DEFAULT']['output'],
+        help='Provide name of output file(s).')
 args = parser.parse_args()
 
 
@@ -33,13 +43,13 @@ if '.zip' in args.file:
 
         if len(members) == 1:
             with myzip.open(members[0]) as myfile:
-                record = myfile.read()
+                record = json.load(myfile)
 
         elif len(members) > 1:
             recs = []
             for doc in members:
                 with myzip.open(doc) as myfile:
-                    rec = myfile.read()
+                    rec = json.load(myfile)
                     for note in rec['documents']:
                         recs.append(note)
             record = {'documents': recs}
@@ -48,7 +58,22 @@ elif '.js' in args.file:
     with open(args.file, 'r') as f:
         record = json.load(f)
 
-payloads = {x['metadata']['document_id']: {'profileId': args.resource, 'documents': [x['data']]}
+if args.group:
+    from itertools import groupby
+    group_lst = []
+    for k,v in groupby(record['documents'], key=lambda x:x['metadata']['patient_id']):
+        v_lst = list(v)
+        dat_lst = [x['data'] for x in v_lst]
+        drop_keys = ['document_id','visit_id']
+        meta = {key: value for key, value in v_lst[0]['metadata'].items() if key not in drop_keys}
+        group_lst.append({'data': dat_lst, 'metadata': meta})
+    record = {'documents': group_lst}
+
+    payloads = {x['metadata']['patient_id']: {'profileId': args.resource, 'documents': x['data']}
+        for x in record['documents']}
+
+else:
+    payloads = {x['metadata']['document_id']: {'profileId': args.resource, 'documents': [x['data']]}
         for x in record['documents']}
 
 
@@ -80,13 +105,16 @@ req_responses = {k: post_req(v, server_add, process_ep, headers, args.cacert)
 
 #--------------- Formatting -------------#
 #----------------------------------------#
-def format_response(doc, resp, record):
-    doc_id_lst = [x['metadata']['document_id'] for x in record['documents']]
+def format_response(doc, resp, record, grouped):
+    if grouped:
+        id_lst = [x['metadata']['patient_id'] for x in record['documents']]
+    else: 
+        id_lst = [x['metadata']['document_id'] for x in record['documents']]
     r_form = {
         'ApiResponse': resp['ApiResponse'],
         'Encoding': resp['pipeline']['Annotations']['nodes'],
         'Narrative': resp['pipeline']['Narrative'],
-        'MetaData': record['documents'][doc_id_lst.index(doc)]['metadata']
+        'MetaData': record['documents'][id_lst.index(doc)]['metadata']
         }
     
     filter_encode = [x for x in r_form['Encoding'] if x['NodeType']=='Encoding']
@@ -101,7 +129,7 @@ def flatten_response(resp):
     dob = resp['MetaData'].get('patient_dob', None)
     sex = resp['MetaData'].get('patient_gender', None)
     visid = resp['MetaData'].get('visit_id', None)
-    docid = resp['MetaData']['document_id']
+    docid = resp['MetaData'].get('document_id', None)
     proj = resp['MetaData']['project']
     auth = resp['MetaData'].get('author', None)
     
@@ -124,7 +152,7 @@ def flatten_response(resp):
                     ])
     return r_flat
 
-out_json = {k: format_response(k, v, record) for k, v in req_responses.items()}
+out_json = {k: format_response(k, v, record, args.group) for k, v in req_responses.items()}
 out_csv = [flatten_response(x) for x in out_json.values()]
 
 
@@ -137,7 +165,7 @@ with open(args.output + '.json', 'w') as f:
 
 with open(args.output + '.csv', 'w', newline='') as f:
     csv_header = ['patient_id','surname','forename','dob',
-            'gender','document_id','project','encoding',
+            'gender','visit_id','document_id','project','author','encoding',
             'encoding_id','enc_start','enc_end','orig_text']
 
     writer = csv.writer(f)

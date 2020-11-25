@@ -1,6 +1,6 @@
 {"documents": [
 	{
-		"data": "patient has suspected asthma. parents do not have asthma. diagnosed GERD. abdominal pain\nindications of appendicitis\nwill order appendectomy",
+		"data": "patient has suspected asthma. parents do not have asthma. diagnosed GERD.",
 		"metadata": {
 			"patient_id": 1001,
 			"patient_surname": "Smith",
@@ -12,7 +12,19 @@
 		}
 	},
 	{
-		"data": "patient is severely obese. patient is considering weight loss surgery. patient experiencing hearing loss\nno mental confusion\nrecently feeling depressed",
+		"data": "abdominal pain\nindications of appendicitis\nwill order appendectomy",
+		"metadata": {
+			"patient_id": 1001,
+			"patient_surname": "Smith",
+			"patient_forename": "Adam",
+			"patient_dob": "2001-05-12",
+			"patient_gender": "M",
+			"document_id": 2,
+			"project": "my_project1"
+		}
+	},
+	{
+		"data": "patient is severely obese. patient is considering weight loss surgery.",
 		"metadata": {
 			"patient_id": 1002,
 			"patient_surname": "Holiday",
@@ -20,6 +32,18 @@
 			"patient_dob": "1983-02-08",
 			"patient_gender": "F",
 			"document_id": 3,
+			"project": "my_project1"
+		}
+	},
+	{
+		"data": "patient experiencing hearing loss\nno mental confusion\nrecently feeling depressed",
+		"metadata": {
+			"patient_id": 1003,
+			"patient_surname": "Roe",
+			"patient_forename": "John",
+			"patient_dob": "1958-11-24",
+			"patient_gender": "M",
+			"document_id": 4,
 			"project": "my_project1"
 		}
 	}
