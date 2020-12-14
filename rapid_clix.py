@@ -3,7 +3,6 @@ import configparser
 import argparse
 import zipfile
 import json
-import random
 import requests
 import csv
 
@@ -81,8 +80,8 @@ else:
 
 #------------- CNLP Request -------------#
 #----------------------------------------#
-server_add = 'https://edw-clix-d01.med.utah.edu:49120'
-process_ep = '/api/v2.0/cnlp/process'
+server_add = conf['DEFAULT']['host']
+process_ep = conf['DEFAULT']['endpoint']
 headers = {
         'api_key': args.apikey,
         'api_secret': args.apisecret,
@@ -94,7 +93,7 @@ def post_req(pay, add, ep, head, cert):
             add + ep,
             headers = head,
             data = json.dumps(pay),
-            verify = cert)
+            verify = False)
     return json.loads(r.text)
 
 req_responses = {k: post_req(v, server_add, process_ep, headers, args.cacert) 

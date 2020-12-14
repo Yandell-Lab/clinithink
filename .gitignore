@@ -130,3 +130,9 @@ dmypy.json
 
 # Data
 data/
+
+# Zelazny CA certificate
+localhost-chain.pem
+
+# Server test files
+server_test/
