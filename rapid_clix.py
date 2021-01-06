@@ -4,7 +4,6 @@ import argparse
 import zipfile
 import json
 import requests
-import csv
 
 
 
@@ -12,7 +11,7 @@ import csv
 #------------ Argument Parse ------------#
 #----------------------------------------#
 conf = configparser.ConfigParser()
-conf.read('config.ini')
+conf.read('/home/bennet/Documents/PhD/Yandell/software/clinithink/edw_config.ini')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--file', action='store', default=conf['DEFAULT']['file'],
@@ -27,8 +26,10 @@ parser.add_argument('-c', '--cacert', action='store', default=conf['DEFAULT']['c
         help='File path of CA certificate (.pem) used for SSL verification.')
 parser.add_argument('-g', '--group', action='store_true', default=False,
         help='Group documents by patient_id. Reduces number of requests sent to server.')
-parser.add_argument('-o', '--output', action='store', default=conf['DEFAULT']['output'],
-        help='Provide name of output file(s).')
+parser.add_argument('-a', '--abstractions', action='store_true', default=False,
+        help='Only output list of abstractions instead of SNOMED-CT encodings.')
+parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout,
+        help='Provide name of output file. Default (-) writes to stdout.')
 args = parser.parse_args()
 
 
@@ -111,13 +112,18 @@ def format_response(doc, resp, record, grouped):
         id_lst = [x['metadata']['document_id'] for x in record['documents']]
     r_form = {
         'ApiResponse': resp['ApiResponse'],
+        'Edges': resp['pipeline']['Annotations']['edges'],
         'Encoding': resp['pipeline']['Annotations']['nodes'],
         'Narrative': resp['pipeline']['Narrative'],
         'MetaData': record['documents'][id_lst.index(doc)]['metadata']
         }
     
     filter_encode = [x for x in r_form['Encoding'] if x['NodeType']=='Encoding']
-    r_form.update({'Encoding': filter_encode})
+    filter_abstract = [x for x in r_form['Encoding'] if x['NodeType']=='Abstraction']
+    r_form.update({
+        'Encoding': filter_encode,
+        'Abstraction': filter_abstract
+        })
     return r_form
 
 def flatten_response(resp):
@@ -132,7 +138,35 @@ def flatten_response(resp):
     proj = resp['MetaData']['project']
     auth = resp['MetaData'].get('author', None)
     
+    abstract_ids = [x['id'] for x in resp['Abstraction']]
+
+    if args.abstractions:
+        abs_lst = [y['elements'][0]['FeatureValue'] for y in resp['Abstraction']]
+        r_flat.append([
+                    mrn,
+                    sname,
+                    fname,
+                    dob,
+                    sex,
+                    visid,
+                    docid,
+                    proj,
+                    auth,
+                    ','.join(set(abs_lst))
+                    ])
+        return r_flat
+
     for x in resp['Encoding']:
+        abs_lst_ids = [
+                y['from'] for y in resp['Edges'] \
+                if y['to']==x['id'] \
+                and y['from'] in abstract_ids
+                ]
+        abs_lst = [
+                y['elements'][0]['FeatureValue'] for y in resp['Abstraction'] \
+                if y['id'] in abs_lst_ids
+                ]
+
         r_flat.append([
                     mrn,
                     sname,
@@ -147,7 +181,8 @@ def flatten_response(resp):
                     x['id'],
                     x['start'],
                     x['end'],
-                    resp['Narrative'][x['start']:x['end']+1]
+                    resp['Narrative'][x['start']:x['end']+1],
+                    ','.join(abs_lst)
                     ])
     return r_flat
 
@@ -159,19 +194,19 @@ out_csv = [flatten_response(x) for x in out_json.values()]
 
 #---------------- Export ----------------#
 #----------------------------------------#
-with open(args.output + '.json', 'w') as f:
-    json.dump(out_json, f)
+#args.outfile.write(json.dumps(out_json))
 
-with open(args.output + '.csv', 'w', newline='') as f:
+if args.abstractions:
     csv_header = ['patient_id','surname','forename','dob',
-            'gender','visit_id','document_id','project','author','encoding',
-            'encoding_id','enc_start','enc_end','orig_text']
+                'gender','visit_id','document_id','project','author','abstractions']
+else:
+    csv_header = ['patient_id','surname','forename','dob',
+                'gender','visit_id','document_id','project','author','encoding',
+                'encoding_id','enc_start','enc_end','orig_text','abstractions']
 
-    writer = csv.writer(f)
-    writer.writerow(csv_header)
-    for sublst in out_csv:
-        writer.writerows(sublst)
-
-
+header_str = '\t'.join(csv_header)
+flat_out_csv = [item for sublist in out_csv for item in sublist]
+csv_str = '\n'.join(['\t'.join([str(y).replace('\n','') for y in x]) for x in flat_out_csv])
+args.outfile.write(header_str + '\n' + csv_str)
 
 
