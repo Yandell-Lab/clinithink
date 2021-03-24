@@ -7,23 +7,20 @@ usage: rapid_clix.py [-h] [-f FILE] [-r RESOURCE] [-k APIKEY] -s APISECRET
                      [outfile]
 
 positional arguments:
-  outfile               Provide name of output file. Default (-) writes to
-                        stdout.
+
+    outfile               Provide name of output file. Default (-) writes to stdout.
 
 optional arguments:
-  -h, --help            show this help message and exit
-  -f FILE, --file FILE  JSON or zipped JSON file containing clinical
-                        documents.
-  -r RESOURCE, --resource RESOURCE
-                        Name of resource set.
-  -k APIKEY, --apikey APIKEY
-                        User-specific API key from Clinithink.
-  -s APISECRET, --apisecret APISECRET
-                        User-specific secret key from Clinithink.
-  -c CACERT, --cacert CACERT
-                        File path of CA certificate (.pem) used for SSL
-                        verification.
-  -g, --group           Group documents by patient_id. Reduces number of
-                        requests sent to server.
-  -a, --abstractions    Only output list of abstractions instead of SNOMED-CT
-                        encodings.
+
+    -h, --help            show this help message and exit
+    -f FILE, --file FILE  JSON or zipped JSON file containing clinical documents.
+    -r RESOURCE, --resource RESOURCE
+                          Name of resource set.
+    -k APIKEY, --apikey APIKEY
+                          User-specific API key from Clinithink.
+    -s APISECRET, --apisecret APISECRET
+                          User-specific secret key from Clinithink.
+    -c CACERT, --cacert CACERT
+                          File path of CA certificate (.pem) used for SSL verification.
+    -g, --group           Group documents by patient_id. Reduces number of requests sent to server.
+    -a, --abstractions    Only output list of abstractions instead of SNOMED-CT encodings.
