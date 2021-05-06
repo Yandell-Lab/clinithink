@@ -96,7 +96,7 @@ def post_req(pay, add, ep, head, cert):
             add + ep,
             headers = head,
             data = json.dumps(pay),
-            verify = False)
+            verify = cert)
     return json.loads(r.text)
 
 req_responses = {k: post_req(v, server_add, process_ep, headers, args.cacert) 
@@ -139,6 +139,8 @@ def flatten_response(resp):
     docid = resp['MetaData'].get('document_id', None)
     proj = resp['MetaData']['project']
     auth = resp['MetaData'].get('author', None)
+    #admit = resp['MetaData'].get('admission_date', None)
+    obser = resp['MetaData'].get('observation_datetime', None)
     
     abstract_ids = [x['id'] for x in resp['Abstraction']]
 
@@ -154,6 +156,7 @@ def flatten_response(resp):
                     docid,
                     proj,
                     auth,
+                    obser,
                     ','.join(set(abs_lst))
                     ])
         return r_flat
@@ -179,6 +182,7 @@ def flatten_response(resp):
                     docid,
                     proj,
                     auth,
+                    obser,
                     x['elements'][0]['FeatureValue'],
                     x['id'],
                     x['start'],
@@ -200,10 +204,12 @@ out_csv = [flatten_response(x) for x in out_json.values()]
 
 if args.abstractions:
     csv_header = ['patient_id','surname','forename','dob',
-                'gender','visit_id','document_id','project','author','abstractions']
+                'gender','visit_id','document_id','project',
+                'author','observation_datetime','abstractions']
 else:
     csv_header = ['patient_id','surname','forename','dob',
-                'gender','visit_id','document_id','project','author','encoding',
+                'gender','visit_id','document_id','project',
+                'author','observation_datetime','encoding',
                 'encoding_id','enc_start','enc_end','orig_text','abstractions']
 
 header_str = '\t'.join(csv_header)
