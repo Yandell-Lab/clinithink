@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import configparser
 import argparse
 import zipfile
 import json
@@ -12,20 +11,20 @@ import requests
 
 #------------ Argument Parse ------------#
 #----------------------------------------#
-conf = configparser.ConfigParser()
-conf.read('/home/bennet/Documents/PhD/Yandell/software/clinithink/edw_config.ini')
+with open("config.json", "r") as f:
+        conf = json.load(f)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-f', '--file', action='store', default=conf['DEFAULT']['file'],
+parser.add_argument('-d', '--document', action='store', default=conf["document"],
         help='JSON or zipped JSON file containing clinical documents.')
-parser.add_argument('-r', '--resource', action='store', default=conf['DEFAULT']['resource'],
+parser.add_argument('-r', '--resource', action='store', default=conf["resource"],
         help='Name of resource set.')
-parser.add_argument('-k', '--apikey', action='store', default=conf['DEFAULT']['apikey'],
+parser.add_argument('-k', '--apikey', action='store', default=conf["apikey"],
         help='User-specific API key from Clinithink.')
 parser.add_argument('-s', '--apisecret', action='store', required=True,
         help='User-specific secret key from Clinithink.')
-parser.add_argument('-c', '--cacert', action='store', default=conf['DEFAULT']['cacert'],
-        help='File path of CA certificate (.pem) used for SSL verification.')
+#parser.add_argument('-c', '--cacert', action='store', default=conf["cacert"],
+#        help='File path of CA certificate (.pem) used for SSL verification.')
 parser.add_argument('-g', '--group', action='store_true', default=False,
         help='Group documents by patient_id. Reduces number of requests sent to server.')
 parser.add_argument('-a', '--abstractions', action='store_true', default=False,
@@ -39,8 +38,8 @@ args = parser.parse_args()
 
 #-------------- Data Import -------------#
 #----------------------------------------#
-if '.zip' in args.file:
-    with zipfile.ZipFile(args.file) as myzip:
+if '.zip' in args.document:
+    with zipfile.ZipFile(args.document) as myzip:
         members = myzip.namelist()
 
         if len(members) == 1:
@@ -56,8 +55,8 @@ if '.zip' in args.file:
                         recs.append(note)
             record = {'documents': recs}
 
-elif '.js' in args.file:
-    with open(args.file, 'r') as f:
+elif '.js' in args.document:
+    with open(args.document, 'r') as f:
         record = json.load(f)
 
 if args.group:
@@ -83,23 +82,23 @@ else:
 
 #------------- CNLP Request -------------#
 #----------------------------------------#
-server_add = conf['DEFAULT']['host']
-process_ep = conf['DEFAULT']['endpoint']
+server_add = conf['host']
+process_ep = conf['endpoint']
 headers = {
         'api_key': args.apikey,
         'api_secret': args.apisecret,
         'Content-type': 'application/json'
         }
 
-def post_req(pay, add, ep, head, cert):
+def post_req(pay, add, ep, head):
     r = requests.post(
             add + ep,
             headers = head,
             data = json.dumps(pay),
-            verify = cert)
+            verify = False)
     return json.loads(r.text)
 
-req_responses = {k: post_req(v, server_add, process_ep, headers, args.cacert) 
+req_responses = {k: post_req(v, server_add, process_ep, headers) 
         for k, v in payloads.items()}
 
 
