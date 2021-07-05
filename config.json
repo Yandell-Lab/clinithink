@@ -1,9 +1,9 @@
 {
 	"host": "https://edw-clix-d01.med.utah.edu:49120",
 	"endpoint": "/api/v2.0/cnlp/process",
-	"document": "test_cnlp_record.json",
+	"document": "testing/test_cnlp_record.json",
 	"resource": "HPO_all_acronyms",
 	"apikey": "98656737df3a47bcb7d878629a873b55fac00b0a",
 	"cacert": "edw-clix-d01-med-utah-edu-chain.pem",
-	"output": "test_run"
+	"output": "testing/test_run"
 }
