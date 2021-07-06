@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 import sys
 import argparse
 import zipfile
@@ -15,22 +16,24 @@ with open("config.json", "r") as f:
         conf = json.load(f)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--document', action='store', default=conf["document"],
-        help='JSON or zipped JSON file containing clinical documents.')
-parser.add_argument('-r', '--resource', action='store', default=conf["resource"],
-        help='Name of resource set.')
-parser.add_argument('-k', '--apikey', action='store', default=conf["apikey"],
-        help='User-specific API key from Clinithink.')
-parser.add_argument('-s', '--apisecret', action='store', required=True,
-        help='User-specific secret key from Clinithink.')
-#parser.add_argument('-c', '--cacert', action='store', default=conf["cacert"],
-#        help='File path of CA certificate (.pem) used for SSL verification.')
-parser.add_argument('-g', '--group', action='store_true', default=False,
-        help='Group documents by patient_id. Reduces number of requests sent to server.')
-parser.add_argument('-a', '--abstractions', action='store_true', default=False,
-        help='Only output list of abstractions instead of SNOMED-CT encodings.')
-parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout,
-        help='Provide name of output file. Default (-) writes to stdout.')
+parser.add_argument("-d", "--document", action="store", default=conf["document"],
+        help="JSON or zipped JSON file containing clinical documents.")
+parser.add_argument("-r", "--resource", action="store", default=conf["resource"],
+        help="Name of resource set.")
+parser.add_argument("-k", "--apikey", action="store", default=conf["apikey"],
+        help="User-specific API key from Clinithink.")
+parser.add_argument("-s", "--apisecret", action="store", required=True,
+        help="User-specific secret key from Clinithink.")
+#parser.add_argument("-c", "--cacert", action="store", default=conf["cacert"],
+#        help="File path of CA certificate (.pem) used for SSL verification.")
+parser.add_argument("-g", "--group", action="store_true", default=False,
+        help="Group documents by patient_id. Reduces number of requests sent to server.")
+parser.add_argument("-a", "--abstractions", action="store_true", default=False,
+        help="Only output list of abstractions instead of SNOMED-CT encodings.")
+parser.add_argument("-n", "--names", action="store_true", default=False,
+        help="Return HPO term names along with codes. Default returns only codes.")
+parser.add_argument("outfile", nargs="?", type=argparse.FileType("w"), default=sys.stdout,
+        help="Provide name of output file. Default (-) writes to stdout.")
 args = parser.parse_args()
 
 
@@ -38,7 +41,7 @@ args = parser.parse_args()
 
 #-------------- Data Import -------------#
 #----------------------------------------#
-if '.zip' in args.document:
+if ".zip" in args.document:
     with zipfile.ZipFile(args.document) as myzip:
         members = myzip.namelist()
 
@@ -51,43 +54,43 @@ if '.zip' in args.document:
             for doc in members:
                 with myzip.open(doc) as myfile:
                     rec = json.load(myfile)
-                    for note in rec['documents']:
+                    for note in rec["documents"]:
                         recs.append(note)
-            record = {'documents': recs}
+            record = {"documents": recs}
 
-elif '.js' in args.document:
-    with open(args.document, 'r') as f:
+elif ".js" in args.document:
+    with open(args.document, "r") as f:
         record = json.load(f)
 
 if args.group:
     from itertools import groupby
     group_lst = []
-    for k,v in groupby(record['documents'], key=lambda x:x['metadata']['patient_id']):
+    for k,v in groupby(record["documents"], key=lambda x:x["metadata"]["patient_id"]):
         v_lst = list(v)
-        dat_lst = [x['data'] for x in v_lst]
-        drop_keys = ['document_id','visit_id']
-        meta = {key: value for key, value in v_lst[0]['metadata'].items() if key not in drop_keys}
-        group_lst.append({'data': dat_lst, 'metadata': meta})
-    record = {'documents': group_lst}
+        dat_lst = [x["data"] for x in v_lst]
+        drop_keys = ["document_id","visit_id"]
+        meta = {key: value for key, value in v_lst[0]["metadata"].items() if key not in drop_keys}
+        group_lst.append({"data": dat_lst, "metadata": meta})
+    record = {"documents": group_lst}
 
-    payloads = {x['metadata']['patient_id']: {'profileId': args.resource, 'documents': x['data']}
-        for x in record['documents']}
+    payloads = {x["metadata"]["patient_id"]: {"profileId": args.resource, "documents": x["data"]}
+        for x in record["documents"]}
 
 else:
-    payloads = {x['metadata']['document_id']: {'profileId': args.resource, 'documents': [x['data']]}
-        for x in record['documents']}
+    payloads = {x["metadata"]["document_id"]: {"profileId": args.resource, "documents": [x["data"]]}
+        for x in record["documents"]}
 
 
 
 
 #------------- CNLP Request -------------#
 #----------------------------------------#
-server_add = conf['host']
-process_ep = conf['endpoint']
+server_add = conf["host"]
+process_ep = conf["endpoint"]
 headers = {
-        'api_key': args.apikey,
-        'api_secret': args.apisecret,
-        'Content-type': 'application/json'
+        "api_key": args.apikey,
+        "api_secret": args.apisecret,
+        "Content-type": "application/json"
         }
 
 def post_req(pay, add, ep, head):
@@ -106,45 +109,53 @@ req_responses = {k: post_req(v, server_add, process_ep, headers)
 
 #--------------- Formatting -------------#
 #----------------------------------------#
+def hpo_parse(hpo_str):
+    hpo_reg = re.compile(r"HP\d{7}")
+    srch = hpo_reg.search(hpo_str).group()
+    return srch.replace("HP", "HP:", 1)
+
 def format_response(doc, resp, record, grouped):
     if grouped:
-        id_lst = [x['metadata']['patient_id'] for x in record['documents']]
+        id_lst = [x["metadata"]["patient_id"] for x in record["documents"]]
     else: 
-        id_lst = [x['metadata']['document_id'] for x in record['documents']]
+        id_lst = [x["metadata"]["document_id"] for x in record["documents"]]
     r_form = {
-        'ApiResponse': resp['ApiResponse'],
-        'Edges': resp['pipeline']['Annotations']['edges'],
-        'Encoding': resp['pipeline']['Annotations']['nodes'],
-        'Narrative': resp['pipeline']['Narrative'],
-        'MetaData': record['documents'][id_lst.index(doc)]['metadata']
+        "ApiResponse": resp["ApiResponse"],
+        "Edges": resp["pipeline"]["Annotations"]["edges"],
+        "Encoding": resp["pipeline"]["Annotations"]["nodes"],
+        "Narrative": resp["pipeline"]["Narrative"],
+        "MetaData": record["documents"][id_lst.index(doc)]["metadata"]
         }
     
-    filter_encode = [x for x in r_form['Encoding'] if x['NodeType']=='Encoding']
-    filter_abstract = [x for x in r_form['Encoding'] if x['NodeType']=='Abstraction']
+    filter_encode = [x for x in r_form["Encoding"] if x["NodeType"]=="Encoding"]
+    filter_abstract = [x for x in r_form["Encoding"] if x["NodeType"]=="Abstraction"]
     r_form.update({
-        'Encoding': filter_encode,
-        'Abstraction': filter_abstract
+        "Encoding": filter_encode,
+        "Abstraction": filter_abstract
         })
     return r_form
 
 def flatten_response(resp):
     r_flat = []
-    mrn = resp['MetaData']['patient_id']
-    sname = resp['MetaData'].get('patient_surname', None)
-    fname = resp['MetaData'].get('patient_forename', None)
-    dob = resp['MetaData'].get('patient_dob', None)
-    sex = resp['MetaData'].get('patient_gender', None)
-    visid = resp['MetaData'].get('visit_id', None)
-    docid = resp['MetaData'].get('document_id', None)
-    proj = resp['MetaData']['project']
-    auth = resp['MetaData'].get('author', None)
-    #admit = resp['MetaData'].get('admission_date', None)
-    obser = resp['MetaData'].get('observation_datetime', None)
+    mrn = resp["MetaData"]["patient_id"]
+    sname = resp["MetaData"].get("patient_surname", None)
+    fname = resp["MetaData"].get("patient_forename", None)
+    dob = resp["MetaData"].get("patient_dob", None)
+    sex = resp["MetaData"].get("patient_gender", None)
+    visid = resp["MetaData"].get("visit_id", None)
+    docid = resp["MetaData"].get("document_id", None)
+    proj = resp["MetaData"]["project"]
+    auth = resp["MetaData"].get("author", None)
+    #admit = resp["MetaData"].get("admission_date", None)
+    obser = resp["MetaData"].get("observation_datetime", None)
     
-    abstract_ids = [x['id'] for x in resp['Abstraction']]
+    abstract_ids = [x["id"] for x in resp["Abstraction"]]
 
     if args.abstractions:
-        abs_lst = [y['elements'][0]['FeatureValue'] for y in resp['Abstraction']]
+        abs_lst = [y["elements"][0]["FeatureValue"] for y in resp["Abstraction"]]
+        if args.names and abs_lst:
+            abs_lst = [hpo_parse(z) for z in abs_lst]
+
         r_flat.append([
                     mrn,
                     sname,
@@ -156,19 +167,19 @@ def flatten_response(resp):
                     proj,
                     auth,
                     obser,
-                    ','.join(set(abs_lst))
+                    ";".join(set(abs_lst))
                     ])
         return r_flat
 
-    for x in resp['Encoding']:
+    for x in resp["Encoding"]:
         abs_lst_ids = [
-                y['from'] for y in resp['Edges'] \
-                if y['to']==x['id'] \
-                and y['from'] in abstract_ids
+                y["from"] for y in resp["Edges"] \
+                if y["to"]==x["id"] \
+                and y["from"] in abstract_ids
                 ]
         abs_lst = [
-                y['elements'][0]['FeatureValue'] for y in resp['Abstraction'] \
-                if y['id'] in abs_lst_ids
+                y["elements"][0]["FeatureValue"] for y in resp["Abstraction"] \
+                if y["id"] in abs_lst_ids
                 ]
 
         r_flat.append([
@@ -182,12 +193,12 @@ def flatten_response(resp):
                     proj,
                     auth,
                     obser,
-                    x['elements'][0]['FeatureValue'],
-                    x['id'],
-                    x['start'],
-                    x['end'],
-                    resp['Narrative'][x['start']:x['end']+1],
-                    ','.join(abs_lst)
+                    x["elements"][0]["FeatureValue"],
+                    x["id"],
+                    x["start"],
+                    x["end"],
+                    resp["Narrative"][x["start"]:x["end"]+1],
+                    ";".join(abs_lst)
                     ])
     return r_flat
 
@@ -202,18 +213,16 @@ out_csv = [flatten_response(x) for x in out_json.values()]
 #args.outfile.write(json.dumps(out_json))
 
 if args.abstractions:
-    csv_header = ['patient_id','surname','forename','dob',
-                'gender','visit_id','document_id','project',
-                'author','observation_datetime','abstractions']
+    csv_header = ["patient_id","surname","forename","dob",
+                "gender","visit_id","document_id","project",
+                "author","observation_datetime","abstractions"]
 else:
-    csv_header = ['patient_id','surname','forename','dob',
-                'gender','visit_id','document_id','project',
-                'author','observation_datetime','encoding',
-                'encoding_id','enc_start','enc_end','orig_text','abstractions']
+    csv_header = ["patient_id","surname","forename","dob",
+                "gender","visit_id","document_id","project",
+                "author","observation_datetime","encoding",
+                "encoding_id","enc_start","enc_end","orig_text","abstractions"]
 
-header_str = '\t'.join(csv_header)
+header_str = "\t".join(csv_header)
 flat_out_csv = [item for sublist in out_csv for item in sublist]
-csv_str = '\n'.join(['\t'.join([str(y).replace('\n','') for y in x]) for x in flat_out_csv])
-args.outfile.write(header_str + '\n' + csv_str)
-
-
+csv_str = "\n".join(["\t".join([str(y).replace("\n","") for y in x]) for x in flat_out_csv])
+args.outfile.write(header_str + "\n" + csv_str)

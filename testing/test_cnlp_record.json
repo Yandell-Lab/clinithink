@@ -46,5 +46,13 @@
 			"document_id": 4,
 			"project": "my_project1"
 		}
+	},
+	{
+		"data": "this note contains no terms of interest",
+		"metadata": {
+			"patient_id": 1004,
+			"document_id": 5,
+			"project": "my_project1"
+		}
 	}
 ]}
